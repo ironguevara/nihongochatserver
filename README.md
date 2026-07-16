@@ -1,62 +1,78 @@
-# Nihongo Chat Server — Gemini com Fallback Automático
+# Nihongo Chat Server — RC14
 
-Esta versão mantém o mesmo endpoint do aplicativo:
+Backend do Chat do **Nihongo Quest**, com personalidades de Dan e Rika, fallback automático entre modelos Gemini, tradução de mensagens japonesas e proteções básicas de produção.
+
+## Endpoints
 
 ```text
-https://nihongochatserver.vercel.app/api/chat
+GET  /api/health
+POST /api/chat
+POST /api/translate
 ```
 
-## Proteções adicionadas
+`/api/chat` recebe o histórico recente, personagem, modo professor e nível de amizade.
 
-O servidor tenta automaticamente, nesta ordem:
+`/api/translate` recebe:
 
-1. `gemini-3.1-flash-lite`
-2. `gemini-3.5-flash`
-3. `gemini-flash-latest`
+```json
+{
+  "text": "今日は元気ですか？",
+  "targetLanguage": "pt"
+}
+```
 
-Quando um modelo responde com alta demanda, timeout, erro 429 ou erro temporário 5xx, o backend aguarda brevemente e tenta o próximo.
+E devolve:
 
-Cada tentativa possui timeout interno. O orçamento total foi limitado para que a função responda antes do timeout de 30 segundos da Vercel.
+```json
+{
+  "romaji": "Kyou wa genki desu ka?",
+  "translation": "Você está bem hoje?"
+}
+```
+
+O idioma pode ser `pt` ou `en`.
 
 ## Variáveis na Vercel
 
-Mantenha:
+Obrigatória:
 
 ```text
-GEMINI_API_KEY = sua chave
-ALLOWED_ORIGIN = *
+GEMINI_API_KEY = sua chave do Google AI Studio
 ```
 
-Substitua `GEMINI_MODEL` por:
+Recomendadas:
 
 ```text
 GEMINI_MODELS = gemini-3.1-flash-lite,gemini-3.5-flash,gemini-flash-latest
+ALLOWED_ORIGIN = *
 ```
 
-A ordem da lista é a ordem de preferência.
+Proteção opcional do aplicativo:
 
-Também é possível deixar `GEMINI_MODELS` ausente. O código utilizará essa mesma sequência como padrão.
+```text
+APP_CLIENT_TOKEN = um valor longo e aleatório
+```
+
+Quando `APP_CLIENT_TOKEN` for configurado, coloque exatamente o mesmo valor na chave `NIHONGO_CHAT_CLIENT_TOKEN` do arquivo `Nihongo-Quest-Info.plist` no projeto Xcode. Durante testes, os dois podem permanecer vazios.
+
+## Proteções RC14
+
+- Limite por minuto e por dia por dispositivo/IP.
+- Máximo de duas requisições simultâneas por cliente.
+- Limites de tamanho do corpo, histórico e mensagens.
+- Cabeçalhos `Cache-Control: no-store` e `X-Request-ID`.
+- Logs estruturados sem armazenar o conteúdo das conversas.
+- Moderação de entrada e saída do Chat.
+- Token opcional para reduzir uso externo direto dos endpoints.
+
+Os limites em memória funcionam por instância serverless. Para alto volume, migre-os para Redis/KV distribuído.
 
 ## Atualização
 
 1. Substitua no GitHub os arquivos antigos pelo conteúdo desta pasta.
-2. Faça commit.
-3. Atualize as variáveis de ambiente na Vercel.
-4. Aguarde o novo deployment ficar `Ready`.
-5. Teste pelo aplicativo.
+2. Faça commit no branch conectado à Vercel.
+3. Confira as variáveis de ambiente.
+4. Aguarde o deployment ficar `Ready`.
+5. Teste `/api/health`, depois Dan/Rika e a tradução pelo aplicativo.
 
-## Diagnóstico
-
-Uma resposta bem-sucedida inclui o cabeçalho:
-
-```text
-X-Gemini-Model
-```
-
-Ele informa qual modelo respondeu.
-
-Se todos estiverem temporariamente indisponíveis, a API retorna status 503 e uma mensagem amigável, em vez de aguardar até a Vercel encerrar a função.
-
-## Observação sobre nível gratuito
-
-Disponibilidade e quotas gratuitas variam por modelo, projeto e região. Consulte o painel **Google AI Studio → Dashboard → Rate Limits** para ver os limites efetivos da sua chave.
+Uma resposta bem-sucedida inclui `X-Gemini-Model`, indicando qual modelo respondeu.

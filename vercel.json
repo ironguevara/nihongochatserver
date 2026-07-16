@@ -3,6 +3,9 @@
   "functions": {
     "api/chat.ts": {
       "maxDuration": 30
+    },
+    "api/translate.ts": {
+      "maxDuration": 30
     }
   }
 }
